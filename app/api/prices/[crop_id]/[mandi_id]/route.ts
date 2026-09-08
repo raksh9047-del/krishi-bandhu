@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentPrice } from "@/lib/agmarknet";
 import { getCropById, getMandiById } from "@/constants";
