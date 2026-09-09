@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.vercel
+.agents
+.claude
+.windsurf
+.idea
+.vscode
+_archive
+scripts
+public/sw.js
+public/swe-worker-*.js
+public/workbox-*.js
+supabase
+*.log

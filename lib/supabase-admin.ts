@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Service-role client for TRUSTED SERVER-SIDE CODE ONLY (app/api/**\/route.ts
@@ -25,15 +25,53 @@ import { createClient } from "@supabase/supabase-js";
  * browser — the service role key must never reach client JS.
  */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+/**
+ * The client is created LAZILY on first use, not at module scope.
+ *
+ * Next.js evaluates every route module during `next build` ("Collecting page
+ * data") to drive its static analysis, and on Vercel the service-role Secret
+ * is only injected into the build for the actual bundling step — it is NOT
+ * present when route modules are first imported during build. A module-scope
+ * `createClient(url, key)` therefore throws "supabaseKey is required" at build
+ * time even though the env var is correct at runtime. Deferring construction
+ * until first property access keeps the build green while still failing fast
+ * if the env is genuinely missing on first request.
+ */
 
-if (!supabaseUrl || !serviceRoleKey) {
-  console.warn(
-    "[KrishiBandhu] Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars for the admin client."
-  );
+let cachedClient: SupabaseClient | null = null;
+
+function getAdminClient(): SupabaseClient {
+  if (cachedClient) return cachedClient;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error(
+      "[KrishiBandhu] Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars for the admin client."
+    );
+  }
+
+  cachedClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false },
+  });
+  return cachedClient;
 }
 
-export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { persistSession: false },
-});
+/**
+ * API-compatible stand-in for a plain `SupabaseClient` export so existing
+ * call sites (`supabaseAdmin.from(...)` etc.) keep working unchanged while
+ * actual construction is deferred to first use.
+ */
+export const supabaseAdmin: SupabaseClient = new Proxy(
+  {} as SupabaseClient,
+  {
+    get(_target, prop: PropertyKey) {
+      const client = getAdminClient();
+      const value = (client as unknown as Record<PropertyKey, unknown>)[prop];
+      return typeof value === "function"
+        ? (value as (...args: unknown[]) => unknown).bind(client)
+        : value;
+    },
+  }
+);
