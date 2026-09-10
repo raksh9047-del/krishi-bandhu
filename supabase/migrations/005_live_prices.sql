@@ -14,7 +14,7 @@
 --   * Writes go through the server-side admin client only (service role);
 --     authenticated clients get the same public read as fpo_price_entries.
 
-create table prices (
+create table if not exists prices (
   id uuid primary key default gen_random_uuid(),
   crop_id text not null references crops(id) on delete restrict,
   mandi_id text not null references mandis(id) on delete restrict,
@@ -25,10 +25,11 @@ create table prices (
   fetched_at timestamptz not null default now()
 );
 
-create unique index idx_prices_crop_mandi_date_source on prices (crop_id, mandi_id, date, source);
-create index idx_prices_crop_mandi on prices (crop_id, mandi_id);
+create unique index if not exists idx_prices_crop_mandi_date_source on prices (crop_id, mandi_id, date, source);
+create index if not exists idx_prices_crop_mandi on prices (crop_id, mandi_id);
 
 alter table prices enable row level security;
 
+drop policy if exists "prices_public_read" on prices;
 create policy "prices_public_read" on prices
   for select to authenticated using (true);

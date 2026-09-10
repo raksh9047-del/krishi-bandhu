@@ -5,6 +5,13 @@
     "retry": "पुनः प्रयास करें",
     "call": "कॉल करें"
   },
+  "home": {
+    "greetingMorning": "सुप्रभात",
+    "greetingAfternoon": "शुभ अपराह्न",
+    "greetingEvening": "शुभ संध्या",
+    "dashboardTitle": "आज का फ़ार्म डैशबोर्ड",
+    "dashboardSubtitle": "ताज़ा भाव, बुवाई संकेत और कमाई का अनुमान।"
+  },
   "registration": {
     "title": "पंजीकरण",
     "nameLabel": "नाम",
@@ -16,6 +23,19 @@
     "upiError": "मान्य UPI ID दर्ज करें, जैसे name@bank.",
     "agristackButton": "AgriStack से सत्यापित करें",
     "agristackTooltip": "AgriStack एक सरकारी रजिस्ट्री है जो अभी शुरू हो रही है। फ़िलहाल स्वयं-पंजीकरण ही सक्रिय रास्ता है।"
+  },
+  "auth": {
+    "title": "साइन इन करें",
+    "farmerTab": "किसान",
+    "traderTab": "व्यापारी",
+    "sendOtp": "OTP भेजें",
+    "otpSent": "OTP भेजा गया",
+    "otpLabel": "6 अंकों का कोड दर्ज करें",
+    "otpError": "6 अंकों का कोड दर्ज करें.",
+    "verify": "सत्यापित और साइन इन",
+    "back": "पीछे",
+    "newHere": "नए हैं?",
+    "error": "साइन-इन विफल हुआ। पुनः प्रयास करें।"
   },
   "sowingSignal": {
     "title": "बुवाई संकेत",

@@ -10,6 +10,7 @@
 
 drop policy if exists "fpo_price_entries_select_own" on fpo_price_entries;
 
+drop policy if exists "fpo_price_entries_public_read" on fpo_price_entries;
 create policy "fpo_price_entries_public_read" on fpo_price_entries
   for select to authenticated using (true);
 

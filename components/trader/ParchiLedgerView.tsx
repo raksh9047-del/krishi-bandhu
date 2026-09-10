@@ -18,20 +18,43 @@ export function ParchiLedgerView() {
   const [state, setState] = useState<DemoState>("valid");
   const [tamperedIndex, setTamperedIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  // Real whole-ledger integrity: every farmer/mandi chain this trader has
+  // written, verified against the DB via /api/parchi/verify?trader_id=...
+  const [integrity, setIntegrity] = useState<{
+    total: number;
+    validChains: number;
+    brokenChains: number;
+    allValid: boolean;
+  } | null>(null);
 
   async function loadChain() {
     if (!currentTraderId) return;
     setLoading(true);
-    const res = await fetch(
-      `/api/parchi/list?trader_id=${currentTraderId}&crop_id=${selectedCropId}&mandi_id=${selectedMandiId}&limit=5`
-    );
-    const data = await res.json();
+    const [listRes, verifyRes] = await Promise.all([
+      fetch(`/api/parchi/list?trader_id=${currentTraderId}&crop_id=${selectedCropId}&mandi_id=${selectedMandiId}&limit=5`),
+      fetch(`/api/parchi/verify?trader_id=${currentTraderId}`),
+    ]);
+    const data = await listRes.json();
     const entries = (data.entries ?? []) as ParchiRecord[];
     const ordered = [...entries].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     setPristineChain(ordered);
     setDisplayedChain(ordered);
     setState("valid");
     setTamperedIndex(null);
+
+    try {
+      const verify = await verifyRes.json();
+      if (verify.mode === "trader") {
+        setIntegrity({
+          total: (verify.chains as Array<{ entriesChecked: number }>).reduce((n, c) => n + c.entriesChecked, 0),
+          validChains: (verify.chains as Array<{ isValid: boolean }>).filter((c) => c.isValid).length,
+          brokenChains: (verify.chains as Array<{ isValid: boolean }>).filter((c) => !c.isValid).length,
+          allValid: verify.allValid,
+        });
+      }
+    } catch {
+      setIntegrity((prev) => prev);
+    }
     setLoading(false);
   }
 
@@ -78,6 +101,25 @@ export function ParchiLedgerView() {
 
       {loading && <p className="text-base text-slate-500">Loading...</p>}
 
+      {integrity && integrity.total > 0 && (
+        <div
+          className={`rounded-card border p-3 text-base ${
+            integrity.allValid
+              ? "border-signal-green bg-signal-green/10 text-signal-green"
+              : "border-signal-red bg-signal-red/10 text-signal-red"
+          }`}
+        >
+          {integrity.allValid ? (
+            <p>
+              ✓ Ledger integrity verified — {integrity.validChains} chain{integrity.validChains === 1 ? "" : "s"},{" "}
+              {integrity.total} record{integrity.total === 1 ? "" : "s"}, all hashes match.
+            </p>
+          ) : (
+            <p>⚠ {integrity.brokenChains} chain{integrity.brokenChains === 1 ? "" : "s"} show tampering.</p>
+          )}
+        </div>
+      )}
+
       {!loading && displayedChain.length === 0 && (
         <p className="text-base text-slate-500">No Parchi records yet for this crop and mandi.</p>
       )}
@@ -115,6 +157,25 @@ export function ParchiLedgerView() {
               <p>
                 {entry.gross_weight}kg @ {entry.deduction_percent}% deduction — ₹{entry.total_amount.toFixed(0)}
               </p>
+              {/* Quality Passport badge */}
+              {(entry.quality_grade || entry.photo_url) && (
+                <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-[#2f6f52]/30 bg-[#2f6f52]/5 px-2 py-1">
+                  <span className="text-xs">📸</span>
+                  {entry.quality_grade && (
+                    <span className="text-xs font-semibold text-[#2f6f52]">
+                      Grade {entry.quality_grade}
+                    </span>
+                  )}
+                  {entry.photo_url && (
+                    <span className="text-xs text-slate-500">Photo ✓</span>
+                  )}
+                  {(entry as any).quality_hash && (
+                    <span className="ml-auto text-[10px] text-slate-400">
+                      QH: {(entry as any).quality_hash.slice(0, 6)}…
+                    </span>
+                  )}
+                </div>
+              )}
               <p className="text-slate-500">
                 Hash: {entry.current_hash.slice(0, 8)}…{entry.current_hash.slice(-4)}
                 {i > 0 && <> — chained from: {displayedChain[i - 1].current_hash.slice(0, 8)}…</>}

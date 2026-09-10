@@ -112,3 +112,16 @@ export async function retryItem(
   onUpdate(next);
   await flushQueue(cropId, mandiId, onUpdate);
 }
+
+/** Drops a queue item outright, e.g. one stranded with an invalid payload. */
+export async function discardItem(
+  cropId: string,
+  mandiId: string,
+  tempId: string,
+  onUpdate: (items: QueueItem[]) => void
+): Promise<void> {
+  const items = await loadQueue(cropId, mandiId);
+  const next = items.filter((i) => i.tempId !== tempId);
+  await saveQueue(cropId, mandiId, next);
+  onUpdate(next);
+}

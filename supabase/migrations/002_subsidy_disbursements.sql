@@ -6,7 +6,7 @@
 -- as its own migration, rather than editing supabase/schema.sql after the
 -- fact — run this AFTER schema.sql.
 
-create table subsidy_disbursements (
+create table if not exists subsidy_disbursements (
   id uuid primary key default gen_random_uuid(),
   crop_id text not null references crops(id) on delete restrict,
   district text not null,
@@ -15,12 +15,13 @@ create table subsidy_disbursements (
   created_at timestamptz not null default now()
 );
 
-create index idx_subsidy_crop_district_month on subsidy_disbursements (crop_id, district, month);
+create index if not exists idx_subsidy_crop_district_month on subsidy_disbursements (crop_id, district, month);
 
 alter table subsidy_disbursements enable row level security;
 
 -- Public-read for every authenticated role, same as crops/mandis — this is
 -- reference/analytics data, not user-scoped.
+drop policy if exists "subsidy_disbursements_public_read" on subsidy_disbursements;
 create policy "subsidy_disbursements_public_read" on subsidy_disbursements
   for select to authenticated using (true);
 

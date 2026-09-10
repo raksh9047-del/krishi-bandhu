@@ -13,10 +13,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "validation_failed", fields: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
+  const { data: existing, error: fetchErr } = await supabaseAdmin
+    .from("bids")
+    .select("status")
+    .eq("id", parsed.data.bid_id)
+    .single();
+
+  if (fetchErr || !existing) {
+    return NextResponse.json({ error: "bid_not_found" }, { status: 404 });
+  }
+
+  if (existing.status !== "pending") {
+    return NextResponse.json(
+      { error: "bid_already_resolved", message: `Bid is already ${existing.status}.` },
+      { status: 409 }
+    );
+  }
+
   const { data: bid, error } = await supabaseAdmin
     .from("bids")
     .update({ status: "accepted" })
     .eq("id", parsed.data.bid_id)
+    .eq("status", "pending")
     .select()
     .single();
 

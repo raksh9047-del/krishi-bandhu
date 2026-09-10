@@ -18,7 +18,16 @@ export async function GET(req: NextRequest) {
   const traderId = req.nextUrl.searchParams.get("trader_id");
   const cropId = req.nextUrl.searchParams.get("crop_id");
   const mandiId = req.nextUrl.searchParams.get("mandi_id");
-  const limit = Number(req.nextUrl.searchParams.get("limit") ?? "5");
+  const rawLimit = Number(req.nextUrl.searchParams.get("limit") ?? "5");
+  const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(100, rawLimit)) : 5;
+
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (farmerId && !uuidRe.test(farmerId)) {
+    return NextResponse.json({ error: "validation_failed", message: "farmer_id must be a valid UUID." }, { status: 400 });
+  }
+  if (traderId && !uuidRe.test(traderId)) {
+    return NextResponse.json({ error: "validation_failed", message: "trader_id must be a valid UUID." }, { status: 400 });
+  }
 
   if (!farmerId && !traderId) {
     return NextResponse.json(

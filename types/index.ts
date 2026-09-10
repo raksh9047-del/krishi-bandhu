@@ -8,6 +8,13 @@ export interface Crop {
   name: string; // display name, e.g. 'Onion'
   nameMr?: string;
   nameHi?: string;
+  /** Free-form category: 'crop' (the pilot's 13 field crops), 'dairy',
+   *  'livestock', 'poultry', 'fishery'. Not an enum — adding a new category
+   * is a data change (insert into crops), not a schema migration. */
+  category?: string;
+  /** Display unit for this crop: 'quintal' for field crops, 'liter' for milk,
+   *  'head' for livestock, 'bird' for poultry, 'kg' for fish. */
+  unit?: string;
 }
 
 export interface Mandi {
@@ -16,6 +23,15 @@ export interface Mandi {
   district: string;
   lat: number;
   lng: number;
+  /** Market type: 'apmc' (official APMC), 'private_mandi', 'farmers_market',
+   *  'wholesaler'. Seeded from Nominatim (lib/nominatim.ts) and user
+   *  submissions (mandi_submissions). */
+  marketType?: string;
+  /** True when this mandi comes from an approved user submission rather than
+   *  the seeded directory — rendered as "community-reported" in the UI. */
+  isUserSubmitted?: boolean;
+  /** True when this mandi is approved for cold storage / warehousing. */
+  allowsColdStorage?: boolean;
 }
 
 export type SowingSignalStatus = "green" | "yellow" | "red";
@@ -57,6 +73,67 @@ export interface ParchiRecord {
   previous_hash: string | null;
   current_hash: string;
   is_genesis: boolean;
+  /**
+   * How money actually moved for this sale. The research finding is that
+   * forcing a digital payment rail breaks the farmer-trader informal-credit
+   * loop, so the Parchi records a sale identically regardless of payment
+   * mode — verification is agnostic to it only because the mode is hashed in.
+   *   cash          — money changed hands at the mandi
+   *   upi           — digital payment to the farmer's VPA
+   *   bank_transfer — NEFT/RTGS/IMPS to the farmer's bank account
+   *   credit        — the trader is also the farmer's lender; no money moved
+   *                   today, this sale offsets an existing informal loan
+   */
+  payment_mode: "cash" | "upi" | "bank_transfer" | "credit";
+  /** UPI transaction ID / cheque ref / NEFT ref, when applicable. */
+  payment_reference: string | null;
+  /** Free-text note for credit sales: what the debt is being offset against. */
+  credit_note: string | null;
+}
+
+/** A manual EPO (Electronic Price Observation) entry. */
+export interface EpoPriceEntry {
+  id: string;
+  observer_id: string;
+  crop_id: string;
+  mandi_id: string;
+  price_per_quintal: number;
+  arrival_volume_tons: number | null;
+  observed_at: string;
+  note: string | null;
+  created_at: string;
+}
+
+/** A user-submitted mandi awaiting approval. */
+export interface MandiSubmission {
+  id: string;
+  submitted_by: string | null;
+  name: string;
+  district: string;
+  lat: number;
+  lng: number;
+  market_type: "apmc" | "private_mandi" | "farmers_market" | "wholesaler";
+  contact_number: string | null;
+  notes: string | null;
+  status: "pending" | "approved" | "rejected";
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export type FarmerAlertType = "parchi_recorded" | "price_alert" | "sowing_alert" | "arrival" | "system";
+export type AlertSeverity = "info" | "warning" | "danger";
+
+export interface FarmerAlert {
+  id: string;
+  farmer_id: string;
+  type: FarmerAlertType;
+  severity: AlertSeverity;
+  title: string;
+  message: string;
+  payload: Record<string, unknown> | null;
+  is_read: boolean;
+  created_at: string;
 }
 
 export interface Dispute {
@@ -101,4 +178,5 @@ export type FeedBubble =
   | { type: "price_update"; crop_id: string; mandi_id: string; price_per_quintal: number; source: string; timestamp: string }
   | { type: "signal_change"; crop_id: string; mandi_id: string; signal_status: SowingSignalStatus; timestamp: string }
   | { type: "parchi_confirmation"; parchi: ParchiRecord; timestamp: string }
-  | { type: "queued_pending"; tempId: string; payload: Record<string, unknown>; attempt: number; timestamp: string };
+  | { type: "queued_pending"; tempId: string; payload: Record<string, unknown>; attempt: number; timestamp: string }
+  | { type: "epo_observation"; crop_id: string; mandi_id: string; price_per_quintal: number; observer: string; timestamp: string };

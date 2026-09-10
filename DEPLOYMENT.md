@@ -13,40 +13,68 @@ Pick one host — you do not need both.
 
 | Variable | Where used | Required? | Notes |
 |---|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | client + server (`lib/supabase.ts`, `lib/supabase-admin.ts`) | yes | Public URL of your Supabase project. |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client reads (`lib/supabase.ts`) | yes | Public anon key — safe in the browser. |
+| `NEXT_PUBLIC_SUPABASE_URL` | client + server (`lib/supabase.ts`, `lib/supabase-server.ts`, `lib/supabase-admin.ts`) | yes | Public URL of your Supabase project. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client reads (`lib/supabase.ts`) + auth routes | yes | Public anon key — safe in the browser. |
 | `SUPABASE_SERVICE_ROLE_KEY` | server routes only (`lib/supabase-admin.ts`) | yes | **Server-only. Never set this client-side or commit it.** Bypasses RLS. |
 | `DATA_GOV_IN_API_KEY` | `lib/agmarknet.ts` | no | Real data.gov.in key for unlimited live-price syncs; falls back to the public demo key (10 records/call). |
 
-`.env.example` holds the first three. `.env.local` exists with placeholders —
+`.env.example` holds all four variables. `.env.local` exists with placeholders —
 replace them with your real values before any Supabase call works.
+
+### Auth routes (new in Phase 10)
+
+The app now has real phone-based OTP auth. These routes live under
+`app/api/auth/` and use the **anon client** for OTP send/verify (the admin
+client can't verify OTPs):
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/auth/signup` | POST | Creates auth user + matching `users` row. `role` fixed to `farmer`/`trader`. |
+| `/api/auth/login` | POST | Triggers OTP to the phone. |
+| `/api/auth/verify-otp` | POST | Verifies OTP, returns session tokens. |
+
+The client stores tokens in `localStorage` under `krishibandhu-session` and
+forwards `Authorization: Bearer <token>` on every API call via
+`components/auth/SessionProvider.tsx`'s `fetchWithAuth`. Server routes use
+`lib/auth.ts`'s `authenticateRequest()` to validate the JWT and build a
+session-scoped client (`lib/supabase-server.ts`) so RLS policies actually
+apply — this is the hardening item flagged in the old `lib/supabase-admin.ts`
+comment.
 
 ---
 
 ## 2. Supabase project setup (manual)
 
 1. Create a project at https://supabase.com/dashboard.
-2. In the SQL Editor, run these **in order**:
-   1. `supabase/schema.sql` (all tables + RLS).
+2. **Enable Phone Auth** (Auth → Sign-in providers → Phone). The app uses
+   phone-based OTP login, not email or password.
+3. In the SQL Editor, run these **in order**:
+   1. `supabase/schema.sql` (all tables + RLS + the auth-user sync trigger).
    2. `supabase/migrations/002_subsidy_disbursements.sql`
    3. `supabase/migrations/003_fpo_price_entries_public_read.sql`
    4. `supabase/migrations/004_bids.sql`
    5. `supabase/migrations/005_live_prices.sql`
    6. `supabase/migrations/006_backhaul_seed.sql` (backhaul trucks)
-3. Seed the pilot demo dataset (subsidy history, sowing signals, seed prices,
-   demo FPO user):
+   7. `supabase/migrations/007_alerts.sql` (farmer alerts table — without this
+      `lib/alerts.ts` silently falls back to Storage JSON blobs, which works
+      but has no efficient filtering or cleanup. Apply it before the seed so
+      alerts created during seeding land in Postgres.)
+4. Seed the pilot demo dataset (subsidy history, sowing signals, seed prices,
+   demo FPO user, AND demo farmer/trader auth accounts):
    ```bash
    node scripts/seed-pilot.mjs                 # prints SQL for the SQL Editor
    node scripts/seed-pilot.mjs --apply         # or apply directly (needs the env vars above)
    ```
-4. **Storage:** create a **public** bucket named `parchi-photos`
+   The `--apply` path also creates the demo auth users (phone `9876543210`
+   farmer, `9876543211` farmer, `9876543220` trader) via the admin client.
+5. **Storage:** create a **public** bucket named `parchi-photos`
    (Storage → New bucket → toggle Public). Required before Parchi
    quality-assessment photo uploads work. This is a dashboard step, not code.
-5. **Auth:** the RLS policies key off `auth.uid()`, so Supabase Auth user ids
-   must match `users.id`. Enable the auth provider you use and ensure
-   `users.id` = the auth user id (or add a trigger to sync them). The pilot
-   routes use the service-role client, so the app works before this is wired;
-   it matters only for real session-based flows.
+6. **Auth sync:** the trigger at the bottom of `schema.sql` keeps `users.id`
+   in sync with `auth.users.id`. Without it, RLS policies that key off
+   `auth.uid()` would never match. The sign-up route (`app/api/auth/signup`)
+   inserts the `users` row with the same UUID as the auth user, so the trigger
+   is a backstop — it also catches users created outside the app.
 
 ---
 
@@ -79,14 +107,16 @@ build, so `/sw.js` is generated server-side at build time — no extra config.
 
 ---
 
-## 4. Optional scheduled jobs (not app code)
+## 4. Scheduled jobs (already configured in `vercel.json`)
 
-- **Weekly Sowing Signal recalc** — the API computes on demand; a recurring
-  job hitting `/api/sowing-signal/calculate` for each active crop/mandi pair
-  keeps signals fresh. On Vercel use Cron Jobs (`vercel.json` crons schema);
-  on Railway/Render use their schedulers against the same URL.
-- **Daily live-price sync** — call `POST /api/prices/sync` daily to pull
-  the Agmarknet feed into `prices` (source='live').
+Both crons are wired in `vercel.json` and fire automatically on Vercel. On
+Railway/Render, set up equivalent schedulers against the same URLs.
+
+- **Daily live-price sync** — `POST /api/prices/sync` runs at 04:30 UTC daily.
+  Pulls the Agmarknet feed into `prices` (source='live').
+- **Weekly Sowing Signal recalc** — `POST /api/sowing-signal/calculate` runs
+  every Sunday at 06:00 UTC. Recalculates signals for every active crop/mandi
+  pair whose sowing window is open.
 
 ---
 
@@ -100,6 +130,7 @@ didn't produce.
 
 | # | Check | Result |
 |---|---|---|
+| 0 | Sign up a new farmer → sign in with OTP → session persists across reloads | `run-live` — `/api/auth/signup`, `/api/auth/login`, `/api/auth/verify-otp` + `SessionProvider` all verified as code; needs a real Supabase project with phone auth enabled. |
 | 1 | Farmer registration → Sowing Signal card shows a real state for all 3 pilot crops | `run-live` — route + thresholds + seed verified as code; needs seeded Supabase. |
 | 2 | A trader creates a Parchi; the ledger shows it with a valid hash | `run-live` — hash-chain + routes audited; needs a real insert. |
 | 3 | "Simulate Kharaba Fraud" runs and resets cleanly for all 3 pilot pairs, incl. live crop switch mid-demo | `run-live` — sandboxed in-memory demo; verifiable by clicking. |

@@ -13,9 +13,16 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
  * keeps the FPO tools working before real session auth exists; Phase 10
  * replaces it with forwarded Supabase Auth sessions.
  */
-const DEMO_FPO_PHONE = "6000000000";
+const DEMO_FPO_PHONE = process.env.DEMO_FPO_PHONE;
 
 export async function GET() {
+  if (!DEMO_FPO_PHONE) {
+    return NextResponse.json(
+      { error: "demo_fpo_missing", message: "DEMO_FPO_PHONE env var is not set. Run scripts/seed-pilot.mjs --apply first." },
+      { status: 500 }
+    );
+  }
+
   const { data, error } = await supabaseAdmin
     .from("users")
     .select("id, name")

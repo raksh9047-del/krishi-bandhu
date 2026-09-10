@@ -89,7 +89,8 @@ export function GovAnalytics() {
     return () => {
       cancelled = true;
     };
-  }, [t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) return <p className="text-base text-slate-500">{t("common.loading")}</p>;
   if (error) return <p className="text-base text-slate-500">{error}</p>;

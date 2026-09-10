@@ -5,6 +5,13 @@
     "retry": "Retry",
     "call": "Call"
   },
+  "home": {
+    "greetingMorning": "Good morning",
+    "greetingAfternoon": "Good afternoon",
+    "greetingEvening": "Good evening",
+    "dashboardTitle": "Today's Farm Dashboard",
+    "dashboardSubtitle": "Live prices, sowing signals & earnings estimate."
+  },
   "registration": {
     "title": "Register",
     "nameLabel": "Name",
@@ -15,7 +22,24 @@
     "phoneError": "Enter a valid 10-digit mobile number.",
     "upiError": "Enter a valid UPI ID, like name@bank.",
     "agristackButton": "Verify with AgriStack",
-    "agristackTooltip": "AgriStack is a government registry still rolling out. Self-registration is the active path for now."
+    "agristackTooltip": "AgriStack is a government registry still rolling out. Self-registration is the active path for now.",
+    "demoIntro": "Jump straight into the demo with a seeded farmer:",
+    "demoFarmer1": "P1 Farmer — sample Parchi & alerts",
+    "demoFarmer2": "Test Farmer — sample alerts",
+    "orCreateNew": "Or register a brand-new farmer:"
+  },
+  "auth": {
+    "title": "Sign In",
+    "farmerTab": "Farmer",
+    "traderTab": "Trader",
+    "sendOtp": "Send OTP",
+    "otpSent": "OTP sent to",
+    "otpLabel": "Enter the 6-digit code",
+    "otpError": "Enter the 6-digit code.",
+    "verify": "Verify & Sign In",
+    "back": "Back",
+    "newHere": "New here?",
+    "error": "Sign-in failed. Try again."
   },
   "sowingSignal": {
     "title": "Sowing Signal",
@@ -44,12 +68,22 @@
   },
   "livePrice": {
     "title": "Market Price",
-    "noData": "No price available yet for this crop and mandi.",
+    "noData": "No current market data available for this crop and mandi.",
     "liveSource": "Agmarknet live release",
     "fpoSource": "FPO entry",
     "seedSource": "Seed data",
+    "refSource": "Agmarknet day reference — not a live price for this mandi",
     "updatedAgo": "updated {ago}",
-    "dailyNote": "Mandi prices are published daily, not in real time."
+    "dailyNote": "Mandi prices are published daily, not in real time.",
+    "liveBadge": "LIVE",
+    "notLiveBadge": "NOT LIVE",
+    "fallbackBadge": "FALLBACK",
+    "marketLine": "Market: {market}",
+    "arrivalDate": "Arrival date: {date}",
+    "syncedAgo": "Synced {ago} ago",
+    "lastLiveLine": "Last live price: ₹{price} on {date}",
+    "noLiveNote": "Live mandi price unavailable right now — showing the last available data.",
+    "offlineNote": "Offline — showing cached price from {ago} ago"
   },
   "feed": {
     "title": "Updates",
@@ -57,7 +91,27 @@
     "sending": "Sending...",
     "queuedPending": "Queued — will send when back online",
     "retryFailed": "Couldn't send — tap to retry",
-    "emptyState": "No updates yet for this crop and mandi."
+    "emptyState": "No updates yet for this crop and mandi.",
+    "verifyChain": "Verify my sale records",
+    "chainChecking": "Verifying...",
+    "chainValid": "Chain valid — {count} records",
+    "chainBroken": "Chain BROKEN at record #{index} — tampering detected",
+    "chainEmpty": "No sale records to verify yet",
+    "mySales": "My sale records",
+    "recordsEmpty": "No sale records for this crop and mandi yet.",
+    "noTraders": "No traders registered yet",
+    "colDate": "Date",
+    "colNet": "Net",
+    "colAmount": "Amount",
+    "colHash": "Hash",
+    "discardFailed": "Discard this failed entry"
+  },
+  "alerts": {
+    "title": "Alerts",
+    "markAllRead": "Mark all read",
+    "emptyState": "No alerts yet.",
+    "parchiTitle": "New Parchi recorded",
+    "parchiMessage": "₹{amount} for {weight}kg of {crop} at {mandi}."
   },
   "storageDirectory": {
     "title": "Cold Storage & Warehouses",
@@ -120,7 +174,8 @@
     "delete": "Delete",
     "cancel": "Cancel",
     "emptyState": "No trucks listed yet.",
-    "deleteConfirm": "Delete this truck?"
+    "deleteConfirm": "Delete this truck?",
+    "departureInvalid": "Choose a valid departure date and time."
   },
   "dataHub": {
     "title": "Data Hub",
@@ -197,5 +252,47 @@
     "description": "Chat with your KrishiBandhu crops desk — advisory and market updates land here once WhatsApp routing is live.",
     "inputPlaceholder": "Type a message...",
     "send": "Send"
+  },
+  "multiMandi": {
+    "title": "Sell Anywhere — Net Realization",
+    "manualCost": "Manual Transport Cost",
+    "estimateFromVillage": "Estimate from Village",
+    "transportLabel": "Transport (₹/q)",
+    "deductionLabel": "Deduction (%)",
+    "bestMandi": "Best mandi for",
+    "effectiveTakeHome": "effective take-home",
+    "priceQ": "Price/q",
+    "netKg": "Net/kg",
+    "savings": "Selling at {best} instead of {worst} nets you ₹{diff}/kg more."
+  },
+  "qualityPassport": {
+    "title": "Visual Quality Passport",
+    "gradeLabel": "Quality Grade",
+    "photoLabel": "Take Photo",
+    "moistureLabel": "Moisture Reading (%)",
+    "capturePhoto": "Capture Photo",
+    "uploadPhoto": "Upload Photo",
+    "gradeA": "Grade A — Premium",
+    "gradeB": "Grade B — Standard",
+    "gradeC": "Grade C — Below Average",
+    "gradeD": "Grade D — Rejected",
+    "qualityHash": "Quality Hash",
+    "verified": "Quality Verified",
+    "notVerified": "Not Verified",
+    "photos": "Photos",
+    "grade": "Grade",
+    "moisture": "Moisture"
+  },
+  "voice": {
+    "hint": "Tap the mic to speak - I can navigate and read prices for you.",
+    "listening": "I am listening. Tell me what you need.",
+    "notUnderstood": "Sorry, I did not understand. Please try again.",
+    "commands": "You can say: Show prices, Check signal, Open mandi, Show map, Trader, Storage, or Backhaul.",
+    "opening": "Opening",
+    "priceAt": "price at",
+    "is": "is",
+    "perQuintal": "rupees per quintal",
+    "fetchFailed": "Could not fetch the price.",
+    "okay": "Okay."
   }
 }

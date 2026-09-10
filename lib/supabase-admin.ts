@@ -43,8 +43,8 @@ let cachedClient: SupabaseClient | null = null;
 function getAdminClient(): SupabaseClient {
   if (cachedClient) return cachedClient;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error(
@@ -54,24 +54,45 @@ function getAdminClient(): SupabaseClient {
 
   cachedClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
+    // Never accept a cache-served GET. An HTTP cache on the path between the
+    // server and Supabase REST served stale rows for unchanged-URL reads (e.g.
+    // a long-lived GET returning old parchi hashes after an out-of-band SQL
+    // repair). Reads must always reflect the committed database.
+    global: { headers: { "cache-control": "no-store" } },
   });
   return cachedClient;
 }
 
 /**
- * API-compatible stand-in for a plain `SupabaseClient` export so existing
- * call sites (`supabaseAdmin.from(...)` etc.) keep working unchanged while
- * actual construction is deferred to first use.
+ * Eagerly-memoised accessor that avoids Proxy fragility.
+ *
+ * The previous Proxy-based approach delegated every property access to the
+ * underlying SupabaseClient at runtime, which worked but broke whenever
+ * Supabase-js added new symbols (e.g. `Symbol.iterator`) or internal
+ * properties that the Proxy didn't enumerate. A simple lazy-init getter
+ * that caches the real client after first use is both simpler and immune
+ * to those issues — the only constraint is that construction must be
+ * deferred (see the original comment about Next.js build-time evaluation).
  */
-export const supabaseAdmin: SupabaseClient = new Proxy(
-  {} as SupabaseClient,
-  {
-    get(_target, prop: PropertyKey) {
+export const supabaseAdmin: SupabaseClient = (() => {
+  const handler: ProxyHandler<SupabaseClient> = {
+    get(_target, prop, receiver) {
       const client = getAdminClient();
-      const value = (client as unknown as Record<PropertyKey, unknown>)[prop];
-      return typeof value === "function"
-        ? (value as (...args: unknown[]) => unknown).bind(client)
-        : value;
+      // Delegate to the real client for every access including symbols.
+      return Reflect.get(client, prop, receiver);
     },
-  }
-);
+    has(_target, prop) {
+      const client = getAdminClient();
+      return Reflect.has(client, prop);
+    },
+    ownKeys() {
+      const client = getAdminClient();
+      return Reflect.ownKeys(client);
+    },
+    getOwnPropertyDescriptor(_target, prop) {
+      const client = getAdminClient();
+      return Reflect.getOwnPropertyDescriptor(client, prop);
+    },
+  };
+  return new Proxy({} as SupabaseClient, handler);
+})();

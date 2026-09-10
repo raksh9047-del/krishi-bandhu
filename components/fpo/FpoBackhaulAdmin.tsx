@@ -14,13 +14,16 @@ import type { BackhaulTruck } from "@/types";
 
 function isoToLocalInputValue(iso: string): string {
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
   const pad = (n: number) => String(n).padStart(2, "0");
   const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`;
 }
 
 function localInputToIso(local: string): string {
-  return new Date(local).toISOString();
+  const d = new Date(local);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString();
 }
 
 const inputClass = "min-h-touch w-full rounded-card border border-slate-300 px-3 text-base";
@@ -94,12 +97,19 @@ export function FpoBackhaulAdmin() {
     setSaving(true);
     setError(null);
 
+    const departureIso = localInputToIso(form.departure_time);
+    if (!departureIso) {
+      setSaving(false);
+      setError(t("fpoBackhaul.departureInvalid"));
+      return;
+    }
+
     const payload = {
       id: editingId,
       truck_number: form.truck_number,
       from_mandi_id: form.from_mandi_id,
       to_village: form.to_village,
-      departure_time: localInputToIso(form.departure_time),
+      departure_time: departureIso,
       available_capacity_kg: Number(form.available_capacity_kg),
       contact_number: form.contact_number,
     };

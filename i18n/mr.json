@@ -5,6 +5,13 @@
     "retry": "पुन्हा प्रयत्न करा",
     "call": "कॉल करा"
   },
+  "home": {
+    "greetingMorning": "सप्रभ सकाळ",
+    "greetingAfternoon": "शुभ दुपार",
+    "greetingEvening": "शुभ संध्याकाळ",
+    "dashboardTitle": "आजचे फार्म डॅशबोर्ड",
+    "dashboardSubtitle": "ताजे भाव, पेरणी सिग्नल आणि कमाईचा अंदाज."
+  },
   "registration": {
     "title": "नोंदणी",
     "nameLabel": "नाव",
@@ -16,6 +23,19 @@
     "upiError": "वैध UPI आयडी टाका, जसे name@bank.",
     "agristackButton": "अग्रीस्टॅकने पडताळणी करा",
     "agristackTooltip": "अग्रीस्टॅक ही सरकारी नोंदणी आहे जी अजून सुरू होत आहे. आत्तासाठी स्वयं-नोंदणी हाच उपलब्ध पर्याय आहे."
+  },
+  "auth": {
+    "title": "साईन इन करा",
+    "farmerTab": "शेतकरी",
+    "traderTab": "व्यापारी",
+    "sendOtp": "OTP पाठवा",
+    "otpSent": "OTP पाठवला गेला",
+    "otpLabel": "6-अंकी कोड टाका",
+    "otpError": "6-अंकी कोड टाका.",
+    "verify": "सत्यापन आणि साईन इन",
+    "back": "मागे",
+    "newHere": "नवीन तुम्ही?",
+    "error": "साईन-इन अयशस्वी झाली. पुन्हा प्रयत्न करा."
   },
   "sowingSignal": {
     "title": "पेरणी सिग्नल",

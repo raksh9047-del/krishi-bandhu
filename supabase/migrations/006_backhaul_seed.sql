@@ -7,8 +7,11 @@
 -- other mandis later is more rows, not new code.
 --
 -- departure_time is seeded relative to now() so the data reads sensibly
--- whenever the migration is applied. Re-running the seed inserts duplicates
--- (no natural unique key) — it is meant to be run once, like schema.sql.
+-- whenever the migration is applied. The seed is idempotent: it first removes
+-- the exact rows this seed defines (by truck number), so re-running never
+-- duplicates and never touches trucks added outside this seed.
+delete from backhaul_trucks
+where truck_number in ('MH-04-AB-1234', 'MH-04-CD-5678', 'MH-05-EF-9012', 'MH-15-GH-3456', 'MH-15-IJ-7890', 'MH-12-KL-2345', 'MH-12-MN-6789', 'MH-12-OP-0123');
 
 insert into backhaul_trucks (truck_number, from_mandi_id, to_village, departure_time, available_capacity_kg, contact_number) values
   -- Vashi (Thane district)

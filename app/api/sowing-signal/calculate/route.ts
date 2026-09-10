@@ -10,8 +10,18 @@ const bodySchema = z.object({
   mandi_id: z.string(),
 });
 
-function firstOfMonth(date: Date): string {
-  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), 1)).toISOString().slice(0, 10);
+/** IST = UTC + 5h 30m — used for "today" comparisons against sowing windows. */
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+function todayIST(): string {
+  const utcMs = Date.now();
+  const istDate = new Date(utcMs + IST_OFFSET_MS);
+  return istDate.toISOString().slice(0, 10);
+}
+
+function firstOfMonthIST(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString().slice(0, 10);
 }
 
 export async function POST(req: NextRequest) {
@@ -46,10 +56,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const today = new Date();
-  const windowStart = new Date(existingSignal.sowing_window_start);
-  const windowEnd = new Date(existingSignal.sowing_window_end);
-  if (today < windowStart || today > windowEnd) {
+  const todayStr = todayIST();
+  const today = new Date(todayStr + "T00:00:00Z");
+  if (todayStr < existingSignal.sowing_window_start || todayStr > existingSignal.sowing_window_end) {
     return NextResponse.json(
       {
         error: "outside_sowing_window",
@@ -65,7 +74,7 @@ export async function POST(req: NextRequest) {
   // systematic signal — it's comprehensive but misses farmers who buy seed
   // privately or replant their own saved seed, which is exactly why it's
   // blended with survey data below rather than used alone.
-  const currentMonthKey = firstOfMonth(today);
+  const currentMonthKey = firstOfMonthIST(todayStr);
   const currentMonthNumber = today.getMonth(); // 0-11, used to match "same month, prior years"
 
   const { data: currentMonthRows } = await supabaseAdmin

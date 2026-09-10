@@ -1,15 +1,20 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentPrice } from "@/lib/agmarknet";
+import { getMarketPriceView } from "@/lib/agmarknet";
 import { getCropById, getMandiById } from "@/constants";
 
 /**
  * GET /api/prices/:crop_id/:mandi_id
  *
- * Current best price for a crop+mandi, preferring an Agmarknet live release
- * over FPO/seed data, then the most recent date. 404 when neither a live nor
- * a manual price exists yet for this pair.
+ * Current market price for a crop+mandi, resolved live:
+ *   * A stored Agmarknet row fresher than 6h is returned as-is.
+ *   * Otherwise the latest-published Agmarknet record for the selected
+ *     crop + Maharashtra mandi is fetched on request and persisted.
+ *   * If the feed has no record for this pair, the best stored value
+ *     (seed/FPO) is returned with `status: "fallback"` so the UI can never
+ *     present fallback data as "Live".
+ *   * 404 "no current market data" only when there is no value at all.
  */
 export async function GET(
   _req: NextRequest,
@@ -30,14 +35,14 @@ export async function GET(
   }
 
   try {
-    const price = await getCurrentPrice(cropId, mandiId);
-    if (!price) {
+    const view = await getMarketPriceView(cropId, mandiId);
+    if (view.price === null || !view.source) {
       return NextResponse.json(
-        { error: "no_price", message: "No price available (no live or manual data)." },
+        { error: "no_price", message: "No current market data available for this crop and mandi." },
         { status: 404 }
       );
     }
-    return NextResponse.json(price);
+    return NextResponse.json(view);
   } catch (error) {
     return NextResponse.json(
       { error: "query_failed", message: error instanceof Error ? error.message : "Unknown error." },

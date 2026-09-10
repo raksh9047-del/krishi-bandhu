@@ -10,6 +10,10 @@ const PHONE_PATTERN = /^[6-9]\d{9}$/;
  * replaces both with actual Supabase Auth sessions. Shown inline wherever a
  * trader screen needs `currentTraderId` and it isn't set yet.
  */
+// Seeded demo trader — has a Parchi chain on the ledger, so the Ledger &
+// Trust screen has real records to verify the moment you sign in.
+const DEMO_TRADER_ID = "b28c318e-cec2-4a3f-9009-21c6ca8be0ad"; // P1 Trader
+
 export function TraderIdentity() {
   const setCurrentTraderId = useAppStore((s) => s.setCurrentTraderId);
   const [name, setName] = useState("");
@@ -41,6 +45,14 @@ export function TraderIdentity() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-card border border-slate-300 p-3">
       <p className="text-base text-slate-700">Set up as a trader to continue.</p>
+      <button
+        type="button"
+        onClick={() => setCurrentTraderId(DEMO_TRADER_ID)}
+        className="min-h-touch rounded-card border border-trust-500 px-4 text-base font-medium text-trust-700"
+      >
+        ▶ Use demo trader account (has sample Parchi)
+      </button>
+      <p className="text-base text-slate-600">Or register a new trader:</p>
       <input
         required
         placeholder="Name"

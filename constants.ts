@@ -7,19 +7,31 @@ import type { Crop, Mandi } from "@/types";
 // expanding coverage later is a data change, not a rebuild.
 
 export const CROPS: Crop[] = [
-  { id: "onion", name: "Onion", nameMr: "कांदा", nameHi: "प्याज़" },
-  { id: "tomato", name: "Tomato", nameMr: "टोमॅटो", nameHi: "टमाटर" },
-  { id: "potato", name: "Potato", nameMr: "बटाटा", nameHi: "आलू" },
-  { id: "cotton", name: "Cotton", nameMr: "कापूस", nameHi: "कपास" },
-  { id: "soybean", name: "Soybean", nameMr: "सोयाबीन", nameHi: "सोयाबीन" },
-  { id: "sugarcane", name: "Sugarcane", nameMr: "ऊस", nameHi: "गन्ना" },
-  { id: "jowar", name: "Jowar", nameMr: "ज्वारी", nameHi: "ज्वार" },
-  { id: "tur", name: "Tur", nameMr: "तूर", nameHi: "तूर" },
-  { id: "banana", name: "Banana", nameMr: "केळी", nameHi: "केला" },
-  { id: "orange", name: "Orange", nameMr: "संत्री", nameHi: "संतरा" },
-  { id: "pomegranate", name: "Pomegranate", nameMr: "डाळिंब", nameHi: "अनार" },
-  { id: "turmeric", name: "Turmeric", nameMr: "हळद", nameHi: "हल्दी" },
-  { id: "grapes", name: "Grapes", nameMr: "द्राक्षे", nameHi: "अंगूर" },
+  { id: "onion", name: "Onion", nameMr: "कांदा", nameHi: "प्याज़", category: "crop", unit: "quintal" },
+  { id: "tomato", name: "Tomato", nameMr: "टोमॅटो", nameHi: "टमाटर", category: "crop", unit: "quintal" },
+  { id: "potato", name: "Potato", nameMr: "बटाटा", nameHi: "आलू", category: "crop", unit: "quintal" },
+  { id: "cotton", name: "Cotton", nameMr: "कापूस", nameHi: "कपास", category: "crop", unit: "quintal" },
+  { id: "soybean", name: "Soybean", nameMr: "सोयाबीन", nameHi: "सोयाबीन", category: "crop", unit: "quintal" },
+  { id: "sugarcane", name: "Sugarcane", nameMr: "ऊस", nameHi: "गन्ना", category: "crop", unit: "quintal" },
+  { id: "jowar", name: "Jowar", nameMr: "ज्वारी", nameHi: "ज्वार", category: "crop", unit: "quintal" },
+  { id: "tur", name: "Tur", nameMr: "तूर", nameHi: "तूर", category: "crop", unit: "quintal" },
+  { id: "banana", name: "Banana", nameMr: "केळी", nameHi: "केला", category: "crop", unit: "quintal" },
+  { id: "orange", name: "Orange", nameMr: "संत्री", nameHi: "संतरा", category: "crop", unit: "quintal" },
+  { id: "pomegranate", name: "Pomegranate", nameMr: "डाळिंब", nameHi: "अनार", category: "crop", unit: "quintal" },
+  { id: "turmeric", name: "Turmeric", nameMr: "हळद", nameHi: "हल्दी", category: "crop", unit: "quintal" },
+  { id: "grapes", name: "Grapes", nameMr: "द्राक्षे", nameHi: "अंगूर", category: "crop", unit: "quintal" },
+  // ── Livestock / dairy / poultry / fishery (Phase 10) ─────────────────────
+  // The pilot is crop-only; these rows exist so expanding to large animals and
+  // dairy is a data change, not a rebuild. The UI surfaces them only when the
+  // user selects one, and the price unit follows `unit` (liter/head/bird/kg).
+  { id: "milk", name: "Milk", nameMr: "दूध", nameHi: "दूध", category: "dairy", unit: "liter" },
+  { id: "buffalo_milk", name: "Buffalo Milk", nameMr: "बैलाचे दूध", nameHi: "भैंस का दूध", category: "dairy", unit: "liter" },
+  { id: "cow", name: "Cattle (Cows)", nameMr: "गाय", nameHi: "गाय", category: "livestock", unit: "head" },
+  { id: "buffalo", name: "Buffalo", nameMr: "बैल", nameHi: "भैंस", category: "livestock", unit: "head" },
+  { id: "goat", name: "Goat", nameMr: "बकडी", nameHi: "बकरी", category: "livestock", unit: "head" },
+  { id: "sheep", name: "Sheep", nameMr: "भेंड", nameHi: "भेड़", category: "livestock", unit: "head" },
+  { id: "poultry", name: "Poultry (Broiler)", nameMr: "बाग", nameHi: "मुर्गी", category: "poultry", unit: "bird" },
+  { id: "fish", name: "Fish", nameMr: "मासे", nameHi: "मछली", category: "fishery", unit: "kg" },
 ];
 
 export const MANDIS: Mandi[] = [
@@ -38,6 +50,10 @@ export const MANDIS: Mandi[] = [
 /** The 3x3 pilot subset used for every build-phase seed and manual test. */
 export const PILOT_CROP_IDS = ["onion", "tomato", "cotton"];
 export const PILOT_MANDI_IDS = ["vashi", "lasalgaon", "pune-gultekdi"];
+
+/** Every supported crop/mandi — the live price sync covers the full list, not just the pilot subset. */
+export const ALL_CROP_IDS: string[] = CROPS.map((c) => c.id);
+export const ALL_MANDI_IDS: string[] = MANDIS.map((m) => m.id);
 
 export function getCropById(id: string): Crop | undefined {
   return CROPS.find((c) => c.id === id);

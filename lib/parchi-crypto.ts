@@ -15,10 +15,17 @@ export const GENESIS_SEED = "GENESIS";
 /** The fields that make up a Parchi's hashed payload — everything that, if
  * altered after the fact, should break the chain. Deliberately excludes
  * `current_hash` itself and `photo_url`/`quality_grade` (those are trust-
- * layer metadata, not the weighbridge transaction the hash protects). */
+ * layer metadata, not the weighbridge transaction the hash protects).
+ *
+ * `payment_mode` / `payment_reference` / `credit_note` ARE hashed in: the
+ * research finding is that forcing a digital payment rail breaks the
+ * farmer-trader informal-credit loop, so the Parchi must record a sale
+ * identically regardless of how money moved. Including the mode in the hash
+ * is what makes verification genuinely agnostic to it — the mode is part of
+ * the tamper-evident record, not a side channel outside it. */
 function toHashPayload(record: Pick<
   ParchiRecord,
-  "farmer_id" | "trader_id" | "crop_id" | "mandi_id" | "gross_weight" | "deduction_percent" | "price_per_quintal" | "timestamp"
+  "farmer_id" | "trader_id" | "crop_id" | "mandi_id" | "gross_weight" | "deduction_percent" | "price_per_quintal" | "timestamp" | "payment_mode" | "payment_reference" | "credit_note"
 >): Record<string, unknown> {
   return {
     farmer_id: record.farmer_id,
@@ -28,6 +35,9 @@ function toHashPayload(record: Pick<
     gross_weight: record.gross_weight,
     deduction_percent: record.deduction_percent,
     price_per_quintal: record.price_per_quintal,
+    payment_mode: record.payment_mode,
+    payment_reference: record.payment_reference ?? null,
+    credit_note: record.credit_note ?? null,
     // Canonicalize so hashing and verifying agree byte-for-byte: the create
     // route hashes `new Date().toISOString()` ("...Z"), while PostgREST reads
     // the same instant back as "...+00:00". Those are two different strings

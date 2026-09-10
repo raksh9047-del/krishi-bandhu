@@ -64,6 +64,38 @@ const PILOT_MANDIS = [
 // lookup in app/api/fpo/demo-user/route.ts.
 const DEMO_FPO = { id: "00000000-0000-4000-8000-0000000000f0", role: "fpo", phone: "6000000000", name: "Demo FPO Coordinator" };
 
+// Demo farmer + trader accounts. These exist so the pilot's login flow
+// (POST /api/auth/login → /api/auth/verify-otp) works without a fresh
+// sign-up, and so the farmer/trader screens have seeded Parchi chains and
+// alerts to display. Each entry here creates BOTH an auth user (via
+// supabase.auth.admin.createUser) AND a matching users row.
+const DEMO_USERS = [
+  {
+    id: "7fa4837a-989b-4abd-98ec-2124b1c1d011",
+    role: "farmer",
+    phone: "9876543210",
+    name: "P1 Demo Farmer",
+    upi_vpa: "p1farmer@upi",
+    hasParchiChain: true,
+  },
+  {
+    id: "9f618a98-f7fd-4c47-bfb5-cb5bde6bec25",
+    role: "farmer",
+    phone: "9876543211",
+    name: "Test Farmer",
+    upi_vpa: null,
+    hasParchiChain: false,
+  },
+  {
+    id: "b28c318e-cec2-4a3f-9009-21c6ca8be0ad",
+    role: "trader",
+    phone: "9876543220",
+    name: "P1 Demo Trader",
+    upi_vpa: "p1trader@upi",
+    hasParchiChain: true,
+  },
+];
+
 // ── Seeded RNG (mulberry32) so historical numbers are reproducible ────────
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -212,6 +244,16 @@ const sqlStatements = [
   `-- Demo FPO user (out of band; the register endpoint refuses to mint FPOs).`,
   `insert into users (id, role, name, phone) values (${q(DEMO_FPO.id)}, 'fpo', ${q(DEMO_FPO.name)}, ${q(DEMO_FPO.phone)})\non conflict (phone) do nothing;`,
   ``,
+  `-- Demo farmer + trader accounts (auth users + matching users rows).`,
+  `-- These are the accounts the pilot's login flow uses. Each needs BOTH an`,
+  `-- auth.users row (so Supabase can issue OTPs) and a users row with the SAME`,
+  `-- UUID (so RLS policies that key off auth.uid() match).`,
+  ...DEMO_USERS.map(
+    (u) =>
+      `-- ${u.role}: ${u.name} (${u.phone})\n` +
+      `-- NOTE: the auth.users row must be created via the admin API, not SQL.`
+  ),
+  ``,
   `-- Subsidy disbursement history (${subsidyRows.length} rows).`,
   `insert into subsidy_disbursements (crop_id, district, month, amount) values\n  ${subsidySql};`,
   ``,
@@ -224,8 +266,9 @@ const sqlStatements = [
 
 if (!APPLY) {
   console.log(`-- KrishiBandhu pilot seed (generated ${todayIso}, ${subsidyRows.length} subsidy + ${signalRows.length} signal + ${priceRows.length} price rows)`);
-  console.log(`-- Run AFTER migrations 001-005 (schema.sql, 002, 003, 004, 005).`);
+  console.log(`-- Run AFTER migrations 001-007 (schema.sql, 002, 003, 004, 005, 006, 007).`);
   console.log(`-- (Backhaul truck rows come from migration 006_backhaul_seed.sql.)`);
+  console.log(`-- Demo auth users (${DEMO_USERS.length} farmer/trader accounts + 1 FPO) are created by the --apply path via the admin API; the SQL editor path only emits the users table rows.`);
   console.log(sqlStatements.join("\n\n"));
   process.exit(0);
 }
@@ -252,16 +295,49 @@ if (!url || !key) {
 }
 const admin = createClient(url, key, { auth: { persistSession: false } });
 
-const { error: userErr } = await admin.from("users").upsert(DEMO_FPO, { onConflict: "phone" });
+// 0. Create auth users for the demo accounts (idempotent).
+//    Uses the admin client's `createUser` — this creates the auth user
+//    directly without needing an OTP, which is correct for seeded demo
+//    accounts. Phone auth must be enabled in the Supabase dashboard.
+for (const u of DEMO_USERS) {
+  const { data: existing, error: lookupErr } = await admin.auth.admin.getUserById(u.id);
+  if (lookupErr && lookupErr.code !== "user_not_found") {
+    console.error(`- error looking up ${u.name}:`, lookupErr.message);
+    continue;
+  }
+  if (!existing) {
+    const { error: createErr } = await admin.auth.admin.createUser({
+      id: u.id,
+      phone: u.phone,
+      user_metadata: { role: u.role, name: u.name },
+    });
+    if (createErr) console.error(`- error creating auth user ${u.name}:`, createErr.message);
+  }
+}
+
+// 1. Upsert the users rows (matching the auth user UUIDs).
+//    Only the real users-table columns are projected — hasParchiChain is a
+//    script-level flag used to drive the Parchi-chain seeding below, not a
+//    column, and passing it through caused "column does not exist" errors.
+for (const u of [...DEMO_USERS, DEMO_FPO]) {
+  const { error } = await admin
+    .from("users")
+    .upsert(
+      { id: u.id, role: u.role, name: u.name, phone: u.phone, upi_vpa: u.upi_vpa ?? null },
+      { onConflict: "phone" },
+    );
+  if (error) console.error(`- error upserting ${u.name}:`, error.message);
+}
+
 const { error: subsidyErr } = await admin.from("subsidy_disbursements").insert(subsidyRows);
 const { error: signalErr } = await admin.from("sowing_signals").upsert(signalRows, { onConflict: "crop_id,mandi_id" });
 const { error: priceErr } = await admin.from("prices").upsert(priceRows, { onConflict: "crop_id,mandi_id,date,source" });
 
-const failures = [userErr, subsidyErr, signalErr, priceErr].filter(Boolean);
+const failures = [subsidyErr, signalErr, priceErr].filter(Boolean);
 for (const err of failures) console.error("- error:", err.message);
 console.log(
   failures.length === 0
-    ? `Applied: ${subsidyRows.length} subsidy, ${signalRows.length} signals, ${priceRows.length} prices, demo FPO. (Backhaul rows come from migration 006.)`
+    ? `Applied: ${subsidyRows.length} subsidy, ${signalRows.length} signals, ${priceRows.length} prices, ${DEMO_USERS.length + 1} demo users. (Backhaul rows come from migration 006.)`
     : `Applied with ${failures.length} error(s).`
 );
 process.exit(failures.length === 0 ? 0 : 1);

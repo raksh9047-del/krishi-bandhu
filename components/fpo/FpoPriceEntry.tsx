@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { useTranslation } from "@/lib/i18n";
 import { CROPS, MANDIS, getCropById, getMandiById } from "@/constants";
+import { formatPerKg, pricePerKg } from "@/lib/price-unit";
 
 /**
  * FPO manual price-entry dashboard — the platform's real, independent price
@@ -26,12 +27,12 @@ function lastMandiKey(fpoId: string): string {
 }
 
 function toCsv(entries: PriceEntry[]): string {
-  const header = ["crop", "mandi", "price_per_quintal", "arrival_volume_tons", "entered_at"];
+  const header = ["crop", "mandi", "price_per_kg", "arrival_volume_tons", "entered_at"];
   const rows = entries.map((e) =>
     [
       getCropById(e.crop_id)?.name ?? e.crop_id,
       getMandiById(e.mandi_id)?.name ?? e.mandi_id,
-      e.price_per_quintal,
+      pricePerKg(e.price_per_quintal),
       e.arrival_volume_tons,
       e.entered_at,
     ].join(",")
@@ -106,7 +107,7 @@ export function FpoPriceEntry() {
         fpo_id: fpoId,
         crop_id: cropId,
         mandi_id: mandiId,
-        price_per_quintal: Number(price),
+        price_per_quintal: Number(price) * 100,
         arrival_volume_tons: Number(arrival),
       }),
     });
@@ -172,7 +173,7 @@ export function FpoPriceEntry() {
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-base text-slate-700">{t("fpoPrice.priceLabel")} (₹/quintal)</span>
+          <span className="text-base text-slate-700">{t("fpoPrice.priceLabel")} (₹/kg)</span>
           <input
             type="number"
             min={0}
@@ -231,7 +232,7 @@ export function FpoPriceEntry() {
                 <tr className="border-b border-slate-300 text-left">
                   <th className="py-2 pr-2 font-medium">{t("fpoPrice.cropLabel")}</th>
                   <th className="py-2 pr-2 font-medium">{t("fpoPrice.mandiLabel")}</th>
-                  <th className="py-2 pr-2 font-medium">₹/q</th>
+                  <th className="py-2 pr-2 font-medium">₹/kg</th>
                   <th className="py-2 pr-2 font-medium">{t("fpoPrice.arrivalShort")}</th>
                   <th className="py-2 font-medium">{t("fpoPrice.enteredAt")}</th>
                 </tr>
@@ -241,7 +242,7 @@ export function FpoPriceEntry() {
                   <tr key={e.id} className="border-b border-slate-100">
                     <td className="py-2 pr-2">{getCropById(e.crop_id)?.name ?? e.crop_id}</td>
                     <td className="py-2 pr-2">{getMandiById(e.mandi_id)?.name ?? e.mandi_id}</td>
-                    <td className="py-2 pr-2">{e.price_per_quintal}</td>
+                    <td className="py-2 pr-2">{formatPerKg(e.price_per_quintal)}</td>
                     <td className="py-2 pr-2">{e.arrival_volume_tons}</td>
                     <td className="py-2">{new Date(e.entered_at).toLocaleDateString("en-IN")}</td>
                   </tr>

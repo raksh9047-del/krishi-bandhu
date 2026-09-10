@@ -20,10 +20,6 @@
     "react-leaflet": "^4.2.1",
     "leaflet": "^1.9.4",
     "recharts": "^2.12.0",
-    "lucide-react": "^0.400.0",
-    "clsx": "^2.1.1",
-    "tailwind-merge": "^2.4.0",
-    "class-variance-authority": "^0.7.0",
     "zod": "^3.23.0",
     "@ducanh2912/next-pwa": "^10.2.9"
   },

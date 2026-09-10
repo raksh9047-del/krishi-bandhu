@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAppStore } from "@/store/useAppStore";
 import { getCropById, getMandiById } from "@/constants";
+import { formatPerKg } from "@/lib/price-unit";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TraderIdentity } from "@/components/trader/TraderIdentity";
 
@@ -62,7 +63,7 @@ export function TraderDashboard() {
         crop_id: lot.crop_id,
         mandi_id: lot.mandi_id,
         listed_price: lot.listed_price_per_quintal,
-        bid_amount: amount,
+        bid_amount: amount * 100,
       }),
     });
     const result = await res.json();
@@ -99,13 +100,13 @@ export function TraderDashboard() {
                 {crop?.name} · {lot.quantity_quintals}q — {lot.farmer_name}
               </p>
               <p className="text-base text-slate-600">
-                {mandi?.name} — Asking ₹{lot.listed_price_per_quintal}/quintal
+                {mandi?.name} — Asking ₹{formatPerKg(lot.listed_price_per_quintal)}/kg
               </p>
               <div className="mt-2 flex items-center gap-2">
                 <input
                   type="number"
                   min={0}
-                  placeholder="Your bid (₹/quintal)"
+                  placeholder="Your bid (₹/kg)"
                   value={bidAmounts[lot.id] ?? ""}
                   onChange={(e) => setBidAmounts((prev) => ({ ...prev, [lot.id]: e.target.value }))}
                   className="min-h-touch flex-1 rounded-card border border-slate-300 px-3 text-base"

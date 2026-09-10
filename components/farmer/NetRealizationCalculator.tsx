@@ -5,21 +5,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { useTranslation } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { calculateNetRealization, type TransportArranger } from "@/lib/net-realization";
-
-/**
- * Net realization estimator with CORRECTED transport handling.
- *
- * The naive model always subtracts transport cost from the payout. That's
- * wrong: transport only reduces the payout when the TRADER arranged pickup
- * (they recover that cost by paying the farmer less). When the farmer
- * arranges their own transport, they already paid it separately — it shows
- * as their own expense line, never as a trader deduction.
- *
- * The price read prefers the new /api/prices/:crop/:mandi route (Agmarknet
- * live over FPO/seed), and falls back to the direct `fpo_price_entries` read
- * if that route is unavailable — so the screen still works before the
- * `prices` migration is applied or when offline.
- */
+import { formatPerKg } from "@/lib/price-unit";
 
 type PriceSource = "live" | "fpo" | "seed";
 
@@ -51,9 +37,9 @@ function formatDate(iso: string): string {
   });
 }
 
-const ARRANGERS: { value: TransportArranger; labelKey: string }[] = [
-  { value: "farmer", labelKey: "netRealization.transportFarmer" },
-  { value: "trader", labelKey: "netRealization.transportTrader" },
+const ARRANGERS: { value: TransportArranger; label: string; icon: string }[] = [
+  { value: "farmer", label: "I arrange transport", icon: "🚜" },
+  { value: "trader", label: "Trader picks up", icon: "🏪" },
 ];
 
 export function NetRealizationCalculator() {
@@ -123,108 +109,141 @@ export function NetRealizationCalculator() {
 
   const sourceLabel =
     price?.source === "live"
-      ? `${t("livePrice.liveSource")}, ${formatDate(price.date)}`
+      ? `Live · ${formatDate(price.date)}`
       : price?.source === "fpo"
-        ? `${t("livePrice.fpoSource")}, updated ${timeAgo(price.fetchedAt)}`
-        : `${t("livePrice.seedSource")}, updated ${timeAgo(price?.fetchedAt ?? "")}`;
+        ? `FPO · ${timeAgo(price.fetchedAt)}`
+        : `Seed · ${timeAgo(price?.fetchedAt ?? "")}`;
 
   return (
-    <div className="rounded-card border border-slate-300 p-4">
-      <h2 className="mb-2 text-lg font-semibold text-slate-900">{t("netRealization.title")}</h2>
+    <div className="overflow-hidden rounded-2xl border border-[#d3e4dc] bg-white shadow-sm fade-up">
+      {/* Card header */}
+      <div className="flex items-center gap-2 border-b border-[#eef4f1] px-4 py-3">
+        <span className="text-lg">🧮</span>
+        <h2 className="font-semibold text-slate-800">{t("netRealization.title")}</h2>
+      </div>
 
-      {priceState === "loading" && <p className="text-base text-slate-500">{t("common.loading")}</p>}
-      {priceState === "unavailable" && (
-        <p className="text-base text-slate-500">{t("livePrice.noData")}</p>
-      )}
+      <div className="px-4 py-4">
+        {priceState === "loading" && (
+          <div className="skeleton h-24 w-full" />
+        )}
 
-      {priceState === "ready" && (
-        <>
-          <p className="mb-3 text-base text-slate-600">
-            {t("netRealization.priceLabel")}: ₹{price!.price.toFixed(0)}/quintal —{" "}
-            <span className="text-slate-500">{t("netRealization.sourceLabel")}: {sourceLabel}</span>
-          </p>
-
-          <div role="radiogroup" aria-label={t("netRealization.transportArrangerLabel")} className="mb-3">
-            <p className="mb-1 text-base text-slate-700">{t("netRealization.transportArrangerLabel")}</p>
-            <div className="flex gap-2">
-              {ARRANGERS.map((option) => {
-                const active = transportArranger === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => setTransportArranger(option.value)}
-                    className={`min-h-touch flex-1 rounded-card border px-3 text-base ${
-                      active ? "border-trust-600 bg-trust-600 text-white" : "border-slate-300 text-slate-700"
-                    }`}
-                  >
-                    {t(option.labelKey)}
-                  </button>
-                );
-              })}
-            </div>
+        {priceState === "unavailable" && (
+          <div className="flex flex-col items-center gap-2 py-4 text-center">
+            <span className="text-3xl">📭</span>
+            <p className="text-sm text-slate-500">{t("livePrice.noData")}</p>
           </div>
+        )}
 
-          <label className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-base text-slate-700">{t("netRealization.transportLabel")} (₹/quintal)</span>
-            <input
-              type="number"
-              min={0}
-              value={transportCost}
-              onChange={(e) => setTransportCost(Number(e.target.value))}
-              className="min-h-touch w-24 rounded-card border border-slate-300 px-2 text-right text-lg"
-            />
-          </label>
-
-          <label className="mb-3 flex items-center justify-between gap-2">
-            <span className="text-base text-slate-700">{t("netRealization.deductionLabel")} (%)</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={deductionPercent}
-              onChange={(e) => setDeductionPercent(Number(e.target.value))}
-              className="min-h-touch w-24 rounded-card border border-slate-300 px-2 text-right text-lg"
-            />
-          </label>
-
-          <div className="rounded-card bg-trust-50 p-3">
-            <dl className="space-y-1">
-              <div className="flex justify-between text-base text-slate-700">
-                <dt>{t("netRealization.grossLine")}</dt>
-                <dd>₹{result.gross_amount.toFixed(0)}</dd>
+        {priceState === "ready" && (
+          <>
+            {/* Price source chip */}
+            <div className="mb-4 flex items-center justify-between rounded-xl bg-[#f4f6f5] px-3 py-2">
+              <span className="text-xs text-slate-500">{t("netRealization.priceLabel")}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-[#1c4432]">₹{formatPerKg(price!.price)}/kg</span>
+                <span className="rounded-full bg-[#d3e4dc] px-2 py-0.5 text-[10px] font-semibold text-[#1c4432]">
+                  {sourceLabel}
+                </span>
               </div>
-              <div className="flex justify-between text-base text-slate-700">
-                <dt>{t("netRealization.deductionLine")} ({deductionPercent}%)</dt>
-                <dd>-₹{deductionAmount.toFixed(0)}</dd>
+            </div>
+
+            {/* Transport arranger toggle */}
+            <div className="mb-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {t("netRealization.transportArrangerLabel")}
+              </p>
+              <div role="radiogroup" aria-label={t("netRealization.transportArrangerLabel")} className="grid grid-cols-2 gap-2">
+                {ARRANGERS.map((option) => {
+                  const active = transportArranger === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setTransportArranger(option.value)}
+                      className={[
+                        "flex items-center justify-center gap-1.5 rounded-xl border py-3 text-sm font-semibold transition-all",
+                        active
+                          ? "border-[#2f6f52] bg-[#2f6f52] text-white shadow-md"
+                          : "border-[#d3e4dc] bg-[#f4f6f5] text-slate-600 hover:border-[#2f6f52]",
+                      ].join(" ")}
+                    >
+                      <span>{option.icon}</span>
+                      {option.label}
+                    </button>
+                  );
+                })}
               </div>
-              {result.transport_deducted_from_payout > 0 && (
-                <div className="flex justify-between text-base text-slate-700">
-                  <dt>{t("netRealization.transportDeductedLine")}</dt>
-                  <dd>-₹{result.transport_deducted_from_payout.toFixed(0)}</dd>
+            </div>
+
+            {/* Inputs row */}
+            <div className="mb-4 grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  {t("netRealization.transportLabel")} (₹/q)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={transportCost}
+                  onChange={(e) => setTransportCost(Number(e.target.value))}
+                  className="w-full min-h-[44px] rounded-xl border border-[#d3e4dc] bg-[#f4f6f5] px-3 text-right text-base font-semibold text-slate-800 focus:border-[#2f6f52] focus:ring-1 focus:ring-[#2f6f52] transition"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  {t("netRealization.deductionLabel")} (%)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={deductionPercent}
+                  onChange={(e) => setDeductionPercent(Number(e.target.value))}
+                  className="w-full min-h-[44px] rounded-xl border border-[#d3e4dc] bg-[#f4f6f5] px-3 text-right text-base font-semibold text-slate-800 focus:border-[#2f6f52] focus:ring-1 focus:ring-[#2f6f52] transition"
+                />
+              </div>
+            </div>
+
+            {/* Result breakdown */}
+            <div className="rounded-xl bg-gradient-to-br from-[#eef4f1] to-white border border-[#d3e4dc] overflow-hidden">
+              <div className="px-4 py-3 space-y-2">
+                <div className="flex items-center justify-between text-sm text-slate-600">
+                  <span>{t("netRealization.grossLine")}</span>
+                  <span className="font-medium">₹{(result.gross_amount / 100).toFixed(2)}</span>
                 </div>
-              )}
-              <div className="flex justify-between border-t border-slate-200 pt-1 text-base font-semibold text-trust-700">
-                <dt>{t("netRealization.netPayoutLine")}</dt>
-                <dd>₹{result.net_payout.toFixed(0)}</dd>
+                <div className="flex items-center justify-between text-sm text-slate-600">
+                  <span>{t("netRealization.deductionLine")} ({deductionPercent}%)</span>
+                  <span className="font-medium text-red-600">−₹{(deductionAmount / 100).toFixed(2)}</span>
+                </div>
+                {result.transport_deducted_from_payout > 0 && (
+                  <div className="flex items-center justify-between text-sm text-slate-600">
+                    <span>{t("netRealization.transportDeductedLine")}</span>
+                    <span className="font-medium text-red-600">−₹{(result.transport_deducted_from_payout / 100).toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+              <div className="border-t border-[#d3e4dc] bg-[#2f6f52] px-4 py-3 flex items-center justify-between">
+                <span className="text-sm font-semibold text-[#d3e4dc]">{t("netRealization.netPayoutLine")}</span>
+                <span className="text-xl font-bold text-white">₹{(result.net_payout / 100).toFixed(2)}</span>
               </div>
               {result.farmer_own_transport_expense > 0 && (
-                <div className="flex justify-between text-base text-slate-700">
-                  <dt>{t("netRealization.ownTransportLine")}</dt>
-                  <dd>-₹{result.farmer_own_transport_expense.toFixed(0)}</dd>
+                <div className="border-t border-[#d3e4dc] bg-[#eef4f1] px-4 py-2 flex items-center justify-between">
+                  <span className="text-xs text-[#255a42]">{t("netRealization.ownTransportLine")}</span>
+                  <span className="text-sm font-semibold text-[#255a42]">−₹{(result.farmer_own_transport_expense / 100).toFixed(2)}</span>
                 </div>
               )}
-            </dl>
-            {result.farmer_own_transport_expense > 0 && (
-              <p className="mt-2 text-lg font-semibold text-trust-700">
-                {t("netRealization.effectiveTakeHomeLine")}: ₹{result.effective_take_home.toFixed(0)}/quintal
-              </p>
-            )}
-          </div>
-        </>
-      )}
+              {result.farmer_own_transport_expense > 0 && (
+                <div className="border-t border-[#d3e4dc] bg-[#1c4432] px-4 py-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#8fb8a6]">{t("netRealization.effectiveTakeHomeLine")}</span>
+                  <span className="text-lg font-bold text-white">₹{(result.effective_take_home / 100).toFixed(2)}/kg</span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
