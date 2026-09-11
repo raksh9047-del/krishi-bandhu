@@ -15,6 +15,10 @@ const QUALITY_GRADES = [
 export function ParchiEntryForm() {
   const currentTraderId = useAppStore((s) => s.currentTraderId);
   const [farmerId, setFarmerId] = useState("");
+  const [farmerPhone, setFarmerPhone] = useState("");
+  const [farmerFound, setFarmerFound] = useState<{ id: string; name: string; village: string | null } | null>(null);
+  const [farmerSearching, setFarmerSearching] = useState(false);
+  const [farmerError, setFarmerError] = useState<string | null>(null);
   const [cropId, setCropId] = useState(CROPS[0].id);
   const [mandiId, setMandiId] = useState(MANDIS[0].id);
   const [grossWeight, setGrossWeight] = useState("");
@@ -51,6 +55,44 @@ export function ParchiEntryForm() {
     const reader = new FileReader();
     reader.onload = () => setPhotoPreview(reader.result as string);
     reader.readAsDataURL(file);
+  }
+
+  async function findFarmer() {
+    if (!/^[6-9]\d{9}$/.test(farmerPhone)) {
+      setFarmerError("Enter a valid 10-digit mobile number.");
+      return;
+    }
+    setFarmerSearching(true);
+    setFarmerError(null);
+    try {
+      const res = await fetch("/api/users/farmer-by-phone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: farmerPhone }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFarmerFound(null);
+        setFarmerId("");
+        setFarmerError(data.message ?? "Farmer not found.");
+        return;
+      }
+      setFarmerFound(data);
+      setFarmerId(data.id);
+    } catch {
+      setFarmerFound(null);
+      setFarmerId("");
+      setFarmerError("Could not look up the farmer. Try again.");
+    } finally {
+      setFarmerSearching(false);
+    }
+  }
+
+  function clearFarmer() {
+    setFarmerFound(null);
+    setFarmerId("");
+    setFarmerPhone("");
+    setFarmerError(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -154,13 +196,44 @@ export function ParchiEntryForm() {
       {fieldErrors._general && <p className="text-base text-signal-red">{fieldErrors._general[0]}</p>}
 
       <label className="flex flex-col gap-1">
-        <span className="text-base text-slate-700">Farmer ID</span>
-        <input
-          required
-          value={farmerId}
-          onChange={(e) => setFarmerId(e.target.value)}
-          className="min-h-touch rounded-card border border-slate-300 px-3 text-lg"
-        />
+        <span className="text-base text-slate-700">Farmer (by mobile number)</span>
+        {farmerFound ? (
+          <div className="rounded-card border border-trust-300 bg-trust-50 p-3">
+            <p className="text-base font-medium text-trust-700">
+              {farmerFound.name}{farmerFound.village ? ` • ${farmerFound.village}` : ""} ✓
+            </p>
+            <p className="mt-0.5 text-xs text-trust-600">ID: {farmerFound.id}</p>
+            <button
+              type="button"
+              onClick={clearFarmer}
+              className="mt-1 text-sm text-signal-red underline"
+            >
+              Change farmer
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              value={farmerPhone}
+              onChange={(e) => {
+                setFarmerPhone(e.target.value);
+                setFarmerError(null);
+              }}
+              inputMode="numeric"
+              placeholder="10-digit mobile number"
+              className="min-h-touch flex-1 rounded-card border border-slate-300 px-3 text-lg"
+            />
+            <button
+              type="button"
+              onClick={findFarmer}
+              disabled={farmerSearching}
+              className="min-h-touch rounded-card border border-trust-500 px-4 text-base font-medium text-trust-700 disabled:opacity-60"
+            >
+              {farmerSearching ? "…" : "Find"}
+            </button>
+          </div>
+        )}
+        {farmerError && <span className="text-base text-signal-red">{farmerError}</span>}
         {fieldErrors.farmer_id && <span className="text-base text-signal-red">{fieldErrors.farmer_id[0]}</span>}
       </label>
 
@@ -372,7 +445,7 @@ export function ParchiEntryForm() {
 
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || !farmerFound}
         className="min-h-touch rounded-card bg-trust-500 px-4 text-lg font-medium text-white disabled:opacity-60"
       >
         Submit
