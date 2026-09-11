@@ -31,9 +31,21 @@ create table if not exists users (
   role user_role not null,
   name text not null,
   phone text not null unique,
+  village text, -- nullable: farmer's village / trader's town
   upi_vpa text, -- nullable: traders/FPOs may not need one; farmers can add later
   created_at timestamptz not null default now()
 );
+
+-- Self-issued OTP fallback (used when no SMS provider is configured).
+-- The demo login route stores a SHA-256 hash of the OTP here; verify-otp
+-- checks it and swaps the code for a real GoTrue session.
+create table if not exists login_otps (
+  phone text primary key,
+  otp_hash text not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+alter table login_otps enable row level security;
 
 -- ─────────────────────────── crops / mandis (reference tables) ───────────────────────────
 -- id is a human-readable slug (text), not a uuid, so seed data and app code
@@ -313,12 +325,18 @@ returns trigger as $$
 begin
   if tg_op = 'INSERT' then
     insert into public.users (id, role, name, phone)
-    values (new.id, 'farmer', coalesce(new.user_metadata->>'name', 'Farmer'), new.phone)
+    values (new.id,
+      case
+        when new.raw_user_meta_data->>'role' in ('farmer','trader','fpo','admin') then (new.raw_user_meta_data->>'role')::public.user_role
+        else 'farmer'::public.user_role
+      end,
+      coalesce(new.raw_user_meta_data->>'name', 'Farmer'),
+      new.phone)
     on conflict (id) do nothing;
     return new;
   elsif tg_op = 'UPDATE' then
     update public.users
-    set name = coalesce(new.user_metadata->>'name', name),
+    set name = coalesce(new.raw_user_meta_data->>'name', name),
         phone = coalesce(new.phone, phone)
     where id = new.id;
     return new;

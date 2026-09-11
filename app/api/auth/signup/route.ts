@@ -18,6 +18,7 @@ const signupSchema = z.object({
   role: z.enum(["farmer", "trader"]),
   name: z.string().min(1),
   phone: z.string().regex(/^[6-9]\d{9}$/, { message: "Enter a valid 10-digit mobile number." }),
+  village: z.string().max(120).nullable().optional(),
   upi_vpa: z
     .string()
     .regex(/^[\w.-]+@[\w]+$/, { message: "Enter a valid UPI ID, like name@bank." })
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "validation_failed", fields: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const { role, name, upi_vpa } = parsed.data;
+  const { role, name, village, upi_vpa } = parsed.data;
   const phone = normalizePhone(parsed.data.phone);
 
   // 1. Create the auth user via the admin client. This is the correct API
@@ -54,10 +55,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "auth_failed", message: authError?.message ?? "Could not create account." }, { status: 500 });
   }
 
-  // 2. Insert the users row with the SAME UUID so RLS (auth.uid() = users.id) works.
+  // 2. Upsert the users row with the SAME UUID so RLS (auth.uid() = users.id)
+  //    works. The auth-sync trigger already created a row during step 1 (from
+  //    user_metadata), so this must be an upsert — a plain insert would hit a
+  //    duplicate-key error on `id`. Upserting also guarantees the role the
+  //    user actually chose (farmer vs trader) wins over the trigger default.
   const { data: userRow, error: insertError } = await supabaseAdmin
     .from("users")
-    .insert({ id: authUser.user.id, role, name, phone, upi_vpa: upi_vpa ?? null })
+    .upsert({ id: authUser.user.id, role, name, phone, village: village ?? null, upi_vpa: upi_vpa ?? null }, { onConflict: "id" })
     .select("id")
     .single();
 

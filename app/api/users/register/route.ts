@@ -20,6 +20,7 @@ const registerSchema = z.object({
   phone: z
     .string()
     .regex(/^[6-9]\d{9}$/, { message: "Enter a valid 10-digit mobile number." }),
+  village: z.string().max(120).nullable().optional(),
   upi_vpa: z
     .string()
     .regex(/^[\w.-]+@[\w]+$/, { message: "Enter a valid UPI ID, like name@bank." })
@@ -34,11 +35,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "validation_failed", fields: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const { role, name, phone, upi_vpa } = parsed.data;
+  const { role, name, phone, village, upi_vpa } = parsed.data;
 
   const { data, error } = await supabaseAdmin
     .from("users")
-    .insert({ role, name, phone, upi_vpa: upi_vpa ?? null })
+    .insert({ role, name, phone, village: village ?? null, upi_vpa: upi_vpa ?? null })
     .select("id")
     .single();
 

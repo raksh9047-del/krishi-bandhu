@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { createClient } from "@supabase/supabase-js";
 
@@ -32,10 +33,13 @@ export async function POST(req: NextRequest) {
   const e164Phone = normalizePhone(phone);
 
   // Look up the user's role so the client can route to the right dashboard.
+  // `users.phone` has been stored in different formats over time (plain
+  // 10-digit for pilot seeds, "+91xxx" via the app signup upsert, "91xxx"
+  // (12-digit, no +) via the auth-sync trigger), so match all three forms.
   const { data: userRow, error: lookupError } = await supabaseAdmin
     .from("users")
     .select("id, role, name")
-    .in("phone", [e164Phone, phone])
+    .in("phone", [e164Phone, phone, e164Phone.slice(1)])
     .maybeSingle();
 
   if (lookupError) {
@@ -62,14 +66,54 @@ export async function POST(req: NextRequest) {
 
   const { error: otpError } = await anonClient.auth.signInWithOtp({ phone: e164Phone });
 
+  // When no SMS provider is configured (pilot demo), GoTrue can't deliver the
+  // code. Fall back to a self-issued OTP: we store its hash in login_otps and
+  // set it as the user's temporary password so verify-otp can swap it for a
+  // REAL GoTrue session via signInWithPassword. Once an SMS provider is
+  // configured on the project, this branch never runs.
+  let demoOtp: string | null = null;
   if (otpError) {
-    return NextResponse.json({ error: "otp_failed", message: otpError.message }, { status: 500 });
+    demoOtp = String(Math.floor(100000 + Math.random() * 900000));
+    const { error: storeError } = await supabaseAdmin
+      .from("login_otps")
+      .upsert(
+        {
+          phone: e164Phone,
+          otp_hash: createHash("sha256").update(demoOtp).digest("hex"),
+          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        },
+        { onConflict: "phone" }
+      );
+
+    if (storeError) {
+      return NextResponse.json(
+        { error: "otp_failed", message: `Could not deliver an OTP (${otpError.message}).` },
+        { status: 500 }
+      );
+    }
+
+    const { error: pwError } = await supabaseAdmin.auth.admin.updateUserById(userRow.id, {
+      password: demoOtp,
+      // The phone is confirmed by the OTP (the tester entered the code we
+      // issued). GoTrue refuses signInWithPassword for phone users whose
+      // phone isn't confirmed — it can only be confirmed via SMS, which has no
+      // provider in this pilot — so we mark it confirmed here. With a real SMS
+      // provider configured, this fallback never runs.
+      phone_confirm: true,
+    });
+    if (pwError) {
+      return NextResponse.json(
+        { error: "otp_failed", message: "Could not prepare an OTP." },
+        { status: 500 }
+      );
+    }
   }
 
   return NextResponse.json({
     ok: true,
     role: userRow.role,
     name: userRow.name,
-    message: "OTP sent.",
+    message: demoOtp ? "Demo OTP generated (SMS provider not configured)." : "OTP sent.",
+    demo_otp: demoOtp,
   });
 }

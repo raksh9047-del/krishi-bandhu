@@ -22,6 +22,7 @@ export default function LoginPage() {
 
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
+  const [demoOtp, setDemoOtp] = useState<string | null>(null);
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [role, setRole] = useState<"farmer" | "trader">("farmer");
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +47,7 @@ export default function LoginPage() {
         setError(result.message ?? t("common.error"));
         return;
       }
+      setDemoOtp(result.demo_otp ?? null);
       setStep("otp");
     } finally {
       setSubmitting(false);
@@ -144,6 +146,11 @@ export default function LoginPage() {
           <p className="text-base text-slate-600">
             {t("auth.otpSent")} <span className="font-medium text-slate-900">{phone}</span>
           </p>
+          {demoOtp && (
+            <div className="rounded-card border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Demo mode (no SMS provider): your code is <span className="font-semibold">{demoOtp}</span>
+            </div>
+          )}
           <label className="flex flex-col gap-1">
             <span className="text-base text-slate-700">{t("auth.otpLabel")}</span>
             <input

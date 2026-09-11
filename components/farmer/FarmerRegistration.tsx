@@ -27,6 +27,7 @@ export function FarmerRegistration() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [village, setVillage] = useState("");
   const [upiVpa, setUpiVpa] = useState("");
   const [errors, setErrors] = useState<{ phone?: string; upiVpa?: string; form?: string }>({});
   const [submitting, setSubmitting] = useState(false);
@@ -54,6 +55,7 @@ export function FarmerRegistration() {
           role: "farmer",
           name,
           phone,
+          village: village.trim().length > 0 ? village : null,
           upi_vpa: upiVpa.trim().length > 0 ? upiVpa : null,
         }),
       });
@@ -137,9 +139,9 @@ export function FarmerRegistration() {
       <label className="flex flex-col gap-1">
         <span className="text-base text-slate-700">{t("registration.villageLabel")}</span>
         <input
-          value={"" /* village is informational; the schema doesn't store it yet — Phase 10 item: add a `village` column to users if needed */}
-          readOnly
-          className="min-h-touch rounded-card border border-slate-200 bg-slate-50 px-3 text-lg text-slate-400"
+          value={village}
+          onChange={(e) => setVillage(e.target.value)}
+          className="min-h-touch rounded-card border border-slate-300 px-3 text-lg"
         />
       </label>
 
