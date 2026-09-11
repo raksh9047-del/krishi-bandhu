@@ -109,6 +109,7 @@ create table if not exists parchi_ledger (
   photo_url text,
   quality_grade text,
   assayer_override_grade text,
+  quality_hash text, -- tamper-evident Quality Passport hash (lib/quality-crypto.ts)
   "timestamp" timestamptz not null default now(),
   previous_hash text, -- null only when is_genesis = true
   current_hash text not null unique,

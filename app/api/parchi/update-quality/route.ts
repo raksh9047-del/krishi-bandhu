@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { generateQualityHash } from "@/lib/quality-crypto";
 
 /**
  * `parchi_ledger` only has SELECT and INSERT RLS policies (Phase 2) — there
@@ -40,6 +41,27 @@ export async function POST(req: NextRequest) {
     assayer_override_grade: assayerGrade,
   };
   if (photoUrl) updatePayload.photo_url = photoUrl;
+
+  // Refresh the quality-passport hash so the ledger's tamper-evident quality
+  // record stays coherent with the grade/photo just saved (mirrors the create
+  // route). Best-effort: a hash failure must never fail the assessment save.
+  const { data: existing } = await supabaseAdmin
+    .from("parchi_ledger")
+    .select("trader_id, crop_id")
+    .eq("id", parchiId)
+    .maybeSingle();
+
+  if (existing && (qualityGrade || photoUrl)) {
+    const qualityHash = await generateQualityHash(
+      { id: parchiId, trader_id: existing.trader_id, crop_id: existing.crop_id },
+      typeof qualityGrade === "string" ? qualityGrade : "",
+      photoUrl,
+      null
+    ).catch(() => null);
+    if (qualityHash) updatePayload.quality_hash = qualityHash;
+  } else if (existing && !qualityGrade && !photoUrl) {
+    updatePayload.quality_hash = null;
+  }
 
   const { data, error } = await supabaseAdmin
     .from("parchi_ledger")
