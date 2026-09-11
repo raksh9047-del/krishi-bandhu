@@ -12,11 +12,16 @@ const QUALITY_GRADES = [
   { id: "D", label: "Grade D — Rejected", color: "text-red-700" },
 ];
 
+// Static demo farmer — the Parchi form records against this by default so the
+// demo works end-to-end with zero setup. Traders can switch to a different
+// farmer via the phone lookup.
+const DEMO_FARMER = { id: "7fa4837a-989b-4abd-98ec-2124b1c1d011", name: "P1 Farmer", village: "Lasalgaon" as string | null };
+
 export function ParchiEntryForm() {
   const currentTraderId = useAppStore((s) => s.currentTraderId);
-  const [farmerId, setFarmerId] = useState("");
+  const [farmerId, setFarmerId] = useState(DEMO_FARMER.id);
   const [farmerPhone, setFarmerPhone] = useState("");
-  const [farmerFound, setFarmerFound] = useState<{ id: string; name: string; village: string | null } | null>(null);
+  const [farmerFound, setFarmerFound] = useState<{ id: string; name: string; village: string | null } | null>(DEMO_FARMER);
   const [farmerSearching, setFarmerSearching] = useState(false);
   const [farmerError, setFarmerError] = useState<string | null>(null);
   const [cropId, setCropId] = useState(CROPS[0].id);
